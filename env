@@ -1,0 +1,5 @@
+DB_PORT="8090"
+DB_HOST="localhost"
+DB_NAME="numbers"
+APP_HOST="localhost
+APP_PORT="8090"
