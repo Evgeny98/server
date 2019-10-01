@@ -22,7 +22,6 @@ r = redis.Redis(host=DB_HOST, port=DB_PORT, db=0)
 
 routes = web.RouteTableDef()
 
-
 @routes.post('/increment')
 async def handle(request: web.Request):
     number = await request.text()
