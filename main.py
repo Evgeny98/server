@@ -1,3 +1,5 @@
+from json import JSONDecodeError
+
 from aiohttp import web
 import logging
 import redis
@@ -7,13 +9,9 @@ import os
 load_dotenv()
 
 DB_HOST = os.getenv('DB_HOST')
-
 DB_PORT = os.getenv('DB_PORT')
-
 DB_NAME = os.getenv('DB_NAME')
-
 APP_HOST = os.getenv('APP_HOST')
-
 APP_PORT = os.getenv('APP_PORT')
 
 logging.basicConfig()
@@ -22,31 +20,69 @@ r = redis.Redis(host=DB_HOST, port=DB_PORT, db=0)
 
 routes = web.RouteTableDef()
 
+
 @routes.post('/increment')
 async def handle(request: web.Request):
-    number = await request.text()
     try:
-        parsed_number = int(number, 10)
-    except ValueError:
-        logging.warning('number parsing error')
-        return web.Response(body='number parsing error', status=400)
+        request_json = await request.json()
+    except JSONDecodeError:
+        logging.warning('request must be json')
+        return web.json_response(
+            data={
+                'error': 'request must be json',
+                'type': 3,
+            },
+            status=400,
+        )
 
-    if parsed_number < 0:
-        logging.warning('number must be positive')
-        return web.Response(body='number must be positive', status=400)
+    try:
+        number = request_json['number']
+    except KeyError:
+        logging.warning('field "number" missing')
+        return web.json_response(
+            data={
+                'error': 'field "number" missing',
+                'type': 3,
+            },
+            status=400,
+        )
+
+    if not isinstance(number, int) or number < 0:
+        logging.warning('field "number" must be positive int')
+        return web.json_response(
+            data={
+                'error': 'field "number" must be positive int',
+                'type': 3,
+            },
+            status=400,
+        )
 
     if r.sismember(DB_NAME, number):
         logging.warning('number already exists')
-        return web.Response(body='number already exists', status=400)
+        return web.json_response(
+            data={
+                'error': 'number already exists',
+                'type': 1,
+            },
+            status=400,
+        )
 
-    incremented_number = f'{parsed_number + 1}'
+    incremented_number = f'{number + 1}'
     if r.sismember(DB_NAME, incremented_number):
         logging.warning('incremented number already exists')
-        return web.Response(body='incremented number already exists', status=400)
+        return web.json_response(
+            data={
+                'error': 'incremented number already exists',
+                'type': 2,
+            },
+            status=400,
+        )
 
-    r.sadd(DB_NAME, parsed_number)
+    r.sadd(DB_NAME, number)
 
-    return web.Response(body=incremented_number)
+    return web.json_response({
+        'result': incremented_number,
+    })
 
 
 app = web.Application()
